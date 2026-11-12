@@ -40,7 +40,7 @@ export function apply(ctx) {
       path: {
         type: 'string',
         required: true,
-        description: '文件的绝对路径（或相对工作区的路径）',
+        description: '文件的绝对路径。⚠️ 相对路径按进程 cwd 解析（不是会话工作区），请一律传绝对路径。',
       },
       algorithm: {
         type: 'string',
@@ -87,7 +87,7 @@ export function apply(ctx) {
       const st = await stat(args.path).catch((e) => {
         throw new Error(`无法访问 ${args.path}: ${e.code || e.message}`)
       })
-      if (st.isDirectory()) throw new Error(`${args.path} 是目录，不是文件`)
+      if (!st.isFile()) throw new Error(`${args.path} 不是普通文件（目录/设备/FIFO 都不行）`)
 
       const t0 = Date.now()
       const { bytes, digests } = await digestFile(args.path, algos)

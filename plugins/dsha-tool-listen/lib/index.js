@@ -3,17 +3,32 @@
  * 后端：MiniMax ASR（asr-1.0），key 读 /root/.minimax_key。
  */
 import { readFile, stat } from 'node:fs/promises'
+import { basename, extname, join } from 'node:path'
+import { homedir } from 'node:os'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const name = 'dsha-tool-listen'
 export const inject = ['tools']
 
-const KEY_PATH = '/root/.minimax_key'
+const KEY_ENV = 'MINIMAX_API_KEY'
+const KEY_FILES = [join(homedir(), '.minimax_key'), '/root/.minimax_key']
 const API = 'https://api.minimax.cn/v1/speech_to_text'
 const MAX_MB = 50
 
+const MIME = {
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
+  '.flac': 'audio/flac', '.ogg': 'audio/ogg', '.opus': 'audio/opus', '.aiff': 'audio/aiff',
+  '.alac': 'audio/mp4',
+}
+
 async function apiKey() {
-  try { return (await readFile(KEY_PATH, 'utf8')).trim() } catch { return '' }
+  const fromEnv = (process.env[KEY_ENV] || '').trim()
+  if (fromEnv) return fromEnv
+  const errs = []
+  for (const p of KEY_FILES) {
+    try { return (await readFile(p, 'utf8')).trim() } catch (e) { errs.push(`${p}(${e.code || e.message})`) }
+  }
+  throw new Error(`读不到 API key：先设环境变量 ${KEY_ENV}，或放到 ${KEY_FILES[0]}。已试：${errs.join(' / ')}`)
 }
 
 export function apply(ctx) {
@@ -48,24 +63,30 @@ export function apply(ctx) {
         },
       },
       render(_a, v) {
-        const head = `时长 ${v.duration.toFixed(1)}s｜${v.segments.length} 段｜说话人 ${v.speakers}`
+        const bits = [`时长 ${v.duration.toFixed(1)}s`]
+        if (v.segments.length) bits.push(`${v.segments.length} 段`)
+        if (v.speakers > 0) bits.push(`说话人 ${v.speakers}`)
+        const head = bits.join('｜')
+        if (!v.segments.length) return [{ type: 'text', text: `${head}\n\n${v.text}` }]
         const body = v.segments.slice(0, 40).map((s) =>
           `[${s.start.toFixed(1)}–${s.end.toFixed(1)}] ${s.text}`).join('\n')
         return [{ type: 'text', text: `${head}\n\n${body}` }]
       },
     },
     async execute(args) {
+      const st = await stat(args.path).catch((e) => {
+        throw new Error(`无法访问 ${args.path}（${e.code || e.message}）`)
+      })
+      if (!st.isFile()) throw new Error(`${args.path} 不是普通文件`)
       const key = await apiKey()
-      if (!key) throw new Error(`读不到 API key：${KEY_PATH}`)
-      const st = await stat(args.path).catch(() => { throw new Error(`无法访问 ${args.path}`) })
-      if (st.isDirectory()) throw new Error(`${args.path} 是目录`)
       if (st.size > MAX_MB * 1024 * 1024) throw new Error(`文件 ${(st.size/1048576).toFixed(1)} MB，超过 ${MAX_MB} MB 上限`)
 
       const buf = await readFile(args.path)
       const form = new FormData()
       form.append('model', 'asr-1.0')
       form.append('response_format', args.detail === 'verbose' ? 'verbose_json' : 'json')
-      form.append('file', new Blob([buf]), args.path.split('/').pop())
+      const mime = MIME[extname(args.path).toLowerCase()] || 'application/octet-stream'
+      form.append('file', new Blob([buf], { type: mime }), basename(args.path))
 
       const res = await fetch(API, {
         method: 'POST',
@@ -78,6 +99,10 @@ export function apply(ctx) {
 
       let data
       try { data = JSON.parse(raw) } catch { throw new Error(`返回不是 JSON：${raw.slice(0, 200)}`) }
+      const br = data && data.base_resp
+      if (br && Number(br.status_code) !== 0) {
+        throw new Error(`ASR 业务错误：${br.status_code} ${br.status_msg || ''}`.trim())
+      }
       const segs = (data.segments || []).map((s) => ({
         start: Number(s.start ?? s.start_time ?? 0),
         end: Number(s.end ?? s.end_time ?? 0),
