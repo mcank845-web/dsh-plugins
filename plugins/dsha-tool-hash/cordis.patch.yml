@@ -1,0 +1,4 @@
+# dsha-tool-hash: 注册 hash 工具（文件摘要校验）
+- insert:
+    - id: tool-hash
+      name: 'dsha-tool-hash'

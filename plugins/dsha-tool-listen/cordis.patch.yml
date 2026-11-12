@@ -1,0 +1,4 @@
+# dsha-tool-listen: 注册 listen 工具（音频转文字）
+- insert:
+    - id: tool-listen
+      name: 'dsha-tool-listen'
