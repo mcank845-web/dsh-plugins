@@ -1,6 +1,7 @@
 /**
  * dsha-tool-listen — 给 agent 加一个 `listen` 工具：把音频转成文字（带时间戳/说话人）。
- * 后端：MiniMax ASR（asr-1.0），key 读 /root/.minimax_key。
+ * 后端：MiniMax ASR（asr-1.0）。
+ * API key 来源（按优先级）：环境变量 MINIMAX_API_KEY → ~/.minimax_key → /root/.minimax_key。
  */
 import { readFile, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
@@ -11,7 +12,7 @@ export const name = 'dsha-tool-listen'
 export const inject = ['tools']
 
 const KEY_ENV = 'MINIMAX_API_KEY'
-const KEY_FILES = [join(homedir(), '.minimax_key'), '/root/.minimax_key']
+const KEY_FILES = [...new Set([join(homedir(), '.minimax_key'), '/root/.minimax_key'])]
 const API = 'https://api.minimax.cn/v1/speech_to_text'
 const MAX_MB = 50
 
@@ -78,8 +79,8 @@ export function apply(ctx) {
         throw new Error(`无法访问 ${args.path}（${e.code || e.message}）`)
       })
       if (!st.isFile()) throw new Error(`${args.path} 不是普通文件`)
-      const key = await apiKey()
       if (st.size > MAX_MB * 1024 * 1024) throw new Error(`文件 ${(st.size/1048576).toFixed(1)} MB，超过 ${MAX_MB} MB 上限`)
+      const key = await apiKey()
 
       const buf = await readFile(args.path)
       const form = new FormData()
