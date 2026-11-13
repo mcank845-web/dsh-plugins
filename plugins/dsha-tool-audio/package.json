@@ -1,0 +1,19 @@
+{
+  "name": "dsha-tool-audio",
+  "description": "DSHA plugin: an `audio_probe` tool that analyzes audio files (.wav, .mp3) for acoustic properties (duration, bitrate, peak, RMS, dynamic range, silence ratio, F0 pitch, spectral centroid)",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "dsha-tool-docx",
+  "description": "DSHA plugin: a `docx_probe` tool that inspects DOCX document structure (TOC, headers/footers, styles, counts)",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2"
+  },
+  "license": "MIT"
+}
